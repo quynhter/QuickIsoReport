@@ -1,3 +1,1 @@
-pandas
-openpyxl
-python-docx
+pip install pandas openpyxl python-docx
