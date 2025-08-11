@@ -24,8 +24,10 @@ def parse_expression(expr):
     total = 1.0
     if len(numbers) > 2:
         numbers = numbers[:2]
-    for num in numbers:
-        total *= float(num)
+        for num in numbers:
+            total *= float(num)
+    elif len(numbers) == 2:
+        total *= float(numbers[0])
     return int(round(total))
 
 # Сохранение в Word
