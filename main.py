@@ -1,65 +1,103 @@
-import pandas as pd
-from openpyxl import Workbook
+import os
 import re
 import random
-import os
+import pandas as pd
+from openpyxl import Workbook
 from docx import Document
-from docx.shared import Pt
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# Поиск файла с иходными данными
-def search_excel_file():
+
+def search_excel_file(): # Поиск файла с иходными данными
     print('Начинаю поиск таблицы с исходными данными...')
     files = os.listdir('./')
     for f in files:
         if '.xlsx' in f and f !='Результат.xlsx':
+            print(f'Обнаружена подходящая таблица: {f}')
             return f
     return None
 
 FILE_PATH = search_excel_file()
 
-# Вычисление количества жил
-def parse_expression(expr):
-    expr = expr.replace(",", ".").replace("х", "x")
-    numbers = re.findall(r"[\d.]+", expr)
-    total = 1.0
-    if len(numbers) > 2:
-        numbers = numbers[:2]
-        for num in numbers:
-            total *= float(num)
-    elif len(numbers) == 2:
-        total *= float(numbers[0])
-    return int(round(total))
 
-# Сохранение в Word
-def make_word_result(result_list: list):
+def parse_expression(expr): # Вычисление количества жил
+    expr = expr.replace(",", ".").replace("х", "x")
+    sections = re.search(r"\d+x\d+(?:\.\d+)?(?:x\d+\.\d+)?", expr)
+    cores = re.split(r"x", sections[0])
+    total = 1
+    
+    if len(cores) > 2:
+        total = int(cores[0]) * int(cores[1])
+    elif len(cores) == 2:
+        total = int(cores[0])
+    return total
+
+
+
+def set_table_borders(table): # Рисовка границ ячеек в таблице в Word
+    tbl = table._tbl  # доступ к XML-таблице
+    tblPr = tbl.tblPr
+
+    tblBorders = OxmlElement('w:tblBorders')
+    for border_name in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+        border = OxmlElement(f'w:{border_name}')
+        border.set(qn('w:val'), 'single')      # тип линии
+        border.set(qn('w:sz'), '8')            # толщина (1/8 pt)
+        border.set(qn('w:space'), '0')
+        border.set(qn('w:color'), '000000')    # цвет
+        tblBorders.append(border)
+
+    tblPr.append(tblBorders)
+
+
+def make_word_result(result_list: list): # Сохранение в Word
     doc = Document()
     last_place = ''
 
     table = doc.add_table(rows=1, cols=5)
-    for result_element in result_list:
+    set_table_borders(table)
+
+    for row in table.rows: # Заполнение и выравнивание ячеек
+        for cell in row.cells:
+            cell.text = "Текст"
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER  # вертикаль
+            for paragraph in cell.paragraphs: # горизонталь
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    for result_element in result_list: # Заполнение строк таблицы
         value_title = list(result_element.keys())[0]
         place = result_element[value_title][0]
         values = result_element[value_title][1]
 
-        # Заголовок блока (одна объединённая ячейка)
-        if last_place == '':
-            hdr_cells = table.rows[0].cells
-            hdr_cells[0].merge(hdr_cells[-1])
-            hdr_cells[0].text = place
-            last_place = place
-            hdr_cells[0].paragraphs[0].runs[0].font.size = Pt(12)
-            row = table.add_row().cells
-            merged_cell = row[0].merge(row[4])
-            merged_cell.text = value_title
-        elif last_place != '' and place != last_place:
+        if last_place == '': # Если самое первое помещение
+            row = table.rows[0].cells
+            row[0].text = '№ п/п'
+            row[1].text = 'Наименование цепи или оборудования'
+            row[2].text = 'Марка кабеля, количество жил, сечение (мм²)'
+            row[3].text = 'Сопротивление изоляции, МОм'
+            row[4].text = 'Заключение о соответствии'
+            
             row = table.add_row().cells
             merged_cell = row[0].merge(row[4])
             merged_cell.text = place
             last_place = place
+            
             row = table.add_row().cells
             merged_cell = row[0].merge(row[4])
             merged_cell.text = value_title
-        else:
+        
+        elif last_place != '' and place != last_place:  # Если помещение сменилось
+            row = table.add_row().cells
+            merged_cell = row[0].merge(row[4])
+            merged_cell.text = place
+            last_place = place
+            
+            row = table.add_row().cells
+            merged_cell = row[0].merge(row[4])
+            merged_cell.text = value_title
+        else: # Если помещение не сменилось
             row = table.add_row().cells
             merged_cell = row[0].merge(row[4])
             merged_cell.text = value_title
@@ -78,15 +116,16 @@ def make_word_result(result_list: list):
                 row[4].text = "Соответствует"
                 i += 1
 
-        # doc.add_paragraph()  # отступ между блоками
-
     doc.save("Результат.docx")
 
-# Сохранение в Excel
-def make_excel_result(result_list: list):
+
+def make_excel_result(result_list: list): # Сохранение в Excel
     wb = Workbook()
     ws = wb.active
     preview_place = ''
+    ws.append(['№ п/п', 'Наименование цепи или оборудования', \
+              'Марка кабеля, количество жил, сечение (мм²)', \
+              'Сопротивление изоляции, МОм', 'Заключение о соответствии'])
     for result_element in result_list:
         value_title = list(result_element.keys())[0]
         place = result_element[value_title][0]
@@ -106,7 +145,7 @@ def make_excel_result(result_list: list):
     wb.save('Результат.xlsx')
 
 
-# Главная исполняющая функция
+
 def main():
     try:
         df_dict = pd.read_excel(FILE_PATH, sheet_name=['Трассы', 'Помещения'])
@@ -139,7 +178,7 @@ def main():
                 value_d = str(row[col_d]).strip()
                 expr_e = str(row[col_e]).strip()
                 try:
-                    count = parse_expression(expr_e)
+                    count = parse_expression(value_d)
                     rand_numbers = [random.randint(700, 900) for _ in range(count)]
 
                     result_element[value_title][1].append([value_a, value_d, rand_numbers])
@@ -150,7 +189,7 @@ def main():
         make_word_result(result_list=result_list)
     except PermissionError:
         return print('Программа не смогла открыть файл, т. к. он уже открыт! Пожалуйста, закройте его.')
-    print('Программа успешно обработала данные и вывела резульат в документы: Результат.xlsx')
+    print('Программа успешно завершена! Результат записан в файлы: Результат.xlsx и Результат.docx')
     input('Нажмите Enter, чтобы завершить...')
 
 
