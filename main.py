@@ -168,7 +168,6 @@ def main():
     col_a = df_data_sheet.columns[0]  # A: Обозначение
     col_c = df_data_sheet.columns[2]  # C: Конец
     col_d = df_data_sheet.columns[3]  # D: Марка и т.п.
-    col_e = df_data_sheet.columns[4]  # E: Сечение
 
     for result_element in result_list:
         value_title = list(result_element.keys())[0]
@@ -176,7 +175,6 @@ def main():
             if str(row[col_c]).strip() == value_title:
                 value_a = str(row[col_a]).strip()
                 value_d = str(row[col_d]).strip()
-                expr_e = str(row[col_e]).strip()
                 try:
                     count = parse_expression(value_d)
                     rand_numbers = [random.randint(700, 900) for _ in range(count)]
