@@ -10,7 +10,7 @@
 
 ### Требования
 - Python 3.8+
-- Библиотека pandas и openpyxl для работы с Excel
+- Библиотека `pandas` и `openpyxl` для работы с Excel
 - Библиотека python-docx для создания Word документов
 
 ### Установка
